@@ -1,0 +1,228 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: black;
+}
+
+#map {
+  height: 100%;
+  position: unset !important;
+}
+
+body {
+  position: relative;
+}
+
+.master-container {
+  overflow: hidden;
+  top: 0;
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.master-container.show-radar .radar-conatiner {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+.master-container.show-radar .radar-conatiner > hr.rotator-hand {
+  -webkit-animation: rotate 10s infinite 0s forwards;
+          animation: rotate 10s infinite 0s forwards;
+}
+
+.master-container.hide-radar .radar-conatiner {
+  display: none;
+}
+
+.radar-conatiner {
+  top: 0;
+  position: relative;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  width: 50vw;
+  height: 50vw;
+  border-radius: 50%;
+  border: 5px solid #3e8614;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.radar-conatiner .radar-inner-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid #3e8614;
+}
+
+.radar-conatiner > div:nth-child(1) {
+  width: 80%;
+  height: 80%;
+}
+
+.radar-conatiner > div:nth-child(2) {
+  width: 60%;
+  height: 60%;
+}
+
+.radar-conatiner > div:nth-child(3) {
+  width: 40%;
+  height: 40%;
+}
+
+.radar-conatiner > div:nth-child(4) {
+  width: 20%;
+  height: 20%;
+}
+
+.radar-conatiner > div:nth-child(5) {
+  width: 3%;
+  height: 3%;
+}
+
+.radar-conatiner > hr.rotator-hand {
+  width: 50%;
+  height: 0px;
+  position: absolute;
+  right: 50%;
+  -webkit-transition: -webkit-transform 10s linear;
+  transition: -webkit-transform 10s linear;
+  transition: transform 10s linear;
+  transition: transform 10s linear, -webkit-transform 10s linear;
+  -webkit-transform-origin: top right;
+          transform-origin: top right;
+  -webkit-transform-style: preserve-3D;
+          transform-style: preserve-3D;
+}
+
+.radar-conatiner > div.rotator-hand {
+  width: 60%;
+  height: 60%;
+  position: absolute;
+  top: 50%;
+  -webkit-transition: -webkit-transform 10s;
+  transition: -webkit-transform 10s;
+  transition: transform 10s;
+  transition: transform 10s, -webkit-transform 10s;
+  -webkit-transform-origin: top left;
+          transform-origin: top left;
+  -webkit-animation: rotate 10s infinite;
+          animation: rotate 10s infinite;
+  -webkit-animation-timing-function: linear;
+          animation-timing-function: linear;
+  z-index: -1;
+  -webkit-transform: rotateZ(45deg);
+          transform: rotateZ(45deg);
+  right: -10%;
+  background: linear-gradient(361deg, #00ff4e -10%, transparent);
+}
+
+@media screen and (max-width: 500px) {
+  .radar-conatiner {
+    width: 80vw;
+    height: 80vw;
+  }
+}
+
+@media screen and (min-width: 501px) and (max-width: 750px) {
+  .radar-conatiner {
+    width: 70vw;
+    height: 70vw;
+  }
+}
+
+@media not all and (min-resolution: 0.001dpcm) {
+  @supports (-webkit-appearance: none) {
+    div.rotator-hand {
+      background: linear-gradient(22deg, #00ff4e -10%, transparent) !important;
+    }
+  }
+}
+
+.rotate-hand {
+  -webkit-transform: rotate(360deg);
+          transform: rotate(360deg);
+}
+
+@-webkit-keyframes rotate {
+  0% {
+    -webkit-transform: rotate(0deg);
+            transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+  }
+}
+
+@keyframes rotate {
+  0% {
+    -webkit-transform: rotate(0deg);
+            transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+  }
+}
+
+.radar-button {
+  position: fixed;
+  right: 10px;
+  bottom: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 5px;
+  border: 0;
+  cursor: pointer;
+  color: #47c51b;
+  background: #2d2d2d;
+}
+
+.radar-button > span {
+  font-size: 36px;
+}
+
+.radar-pop {
+  cursor: pointer;
+  border-radius: 50%;
+  background-color: #47C51B;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  z-index: 99999;
+}
+
+.radar-pop > span {
+  display: none;
+  color: white;
+  font-size: medium;
+  font-family: monospace;
+  position: absolute;
+  left: 15px;
+  top: -3px;
+}
+
+.radar-pop:hover {
+  z-index: 9999999 !important;
+}
+
+.radar-pop:hover > span {
+  display: block;
+}
+/*# sourceMappingURL=styles.css.map */

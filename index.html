@@ -1,0 +1,212 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>
+            Radar
+        </title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="styles.css">
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <!-- File in which google maps token is present as JSON -->
+        <script src="keys/key.js"></script>
+        <script>
+            let showing = false;
+            let minLat, minLng, maxLat, maxLng;
+            let fetchingData = false;
+            let radarActive = false;
+            let radarPos = {
+                '-x': 0,
+                'x': 0,
+                'y': 0,
+                '-y': 0,
+                'center_x': 0,
+                'center_y': 0,
+                'width': 0,
+                'height': 0
+            }
+            window.onload = () => {
+                var radarRotatorHand = document.getElementById("rotator-hand");
+                radarRotatorHand.addEventListener("animationiteration", function(e) { 
+                    if(radarActive && !fetchingData) {
+                        fetchData({minLat, maxLat, minLng, maxLng})
+                    }
+                }, false);
+
+                document.getElementById('button').addEventListener('click', () => {
+                    showing = !showing;
+                    if(showing) {
+                        radarActive = true;
+                        document.getElementsByClassName('master-container')[0].classList.replace('hide-radar', 'show-radar');
+                        map.setOptions({draggable: false, zoomControl: false, scrollwheel: false, disableDoubleClickZoom: true});
+                        setTimeout(() => {
+                            doOp();
+                        }, 10)
+                    }
+                    else {
+                        radarActive = false;
+                        cleanWindow();
+                        document.getElementsByClassName('master-container')[0].classList.replace('show-radar', 'hide-radar');
+                        map.setOptions({draggable: true, zoomControl: true, scrollwheel: true, disableDoubleClickZoom: true});
+                    }
+                });
+            }
+
+            function doOp() {
+                let rect = document.getElementsByClassName('radar-conatiner')[0].getBoundingClientRect();
+                let res = pointToCoordinates({x: rect.x, y: rect.y}, map);
+                let lat = pointToCoordinates({x: rect.x, y: rect.y}, map).lat();
+                let lng = pointToCoordinates({x: rect.x, y: rect.y}, map).lng();
+                radarPos['-x'] = rect.x;
+                radarPos['x'] = rect.x + rect.width;
+                radarPos['-y'] = rect.y;
+                radarPos['y'] = rect.y + rect.height;
+                radarPos['center_x'] = rect.x + (rect.width/2);
+                radarPos['center_y'] = rect.y + (rect.height/2);
+                radarPos['width'] = rect.width;
+                radarPos['height'] = rect.height;
+                minLat = res.lat();
+                minLng = res.lng();
+                res = pointToCoordinates({x: rect.x + rect.width, y: rect.y}, map);
+                maxLng = res.lng();
+                res = pointToCoordinates({x: rect.x, y: rect.y + rect.height}, map);
+                maxLat = res.lat();
+                fetchData({minLat, maxLat, minLng, maxLng});
+            }
+
+            function coordinatesToPoint(latLng, map) {
+                var topRight = map.getProjection().fromLatLngToPoint(map.getBounds().getNorthEast());
+                var bottomLeft = map.getProjection().fromLatLngToPoint(map.getBounds().getSouthWest());
+                var scale = Math.pow(2, map.getZoom());
+                var worldPoint = map.getProjection().fromLatLngToPoint(latLng);
+                return new google.maps.Point((worldPoint.x - bottomLeft.x) * scale, (worldPoint.y - topRight.y) * scale);
+            }
+
+            function pointToCoordinates(point, map) {
+                var topRight = map.getProjection().fromLatLngToPoint(map.getBounds().getNorthEast());
+                var bottomLeft = map.getProjection().fromLatLngToPoint(map.getBounds().getSouthWest());
+                var scale = Math.pow(2, map.getZoom());
+                var worldPoint = new google.maps.Point(point.x / scale + bottomLeft.x, point.y / scale + topRight.y);
+                return map.getProjection().fromPointToLatLng(worldPoint);
+            }
+
+            let fetchData = (latLngData) => {
+                let url = "https://fdr-bymda.herokuapp.com/";
+                let xmlHttp = new XMLHttpRequest();
+                xmlHttp.open("POST", url, false);
+                xmlHttp.onreadystatechange = () => {
+                    if(xmlHttp.readyState === 4 && xmlHttp.status === 200) {
+                        let responseData = JSON.parse(xmlHttp.response);
+                        cleanWindow();
+                        populateDataV2(responseData)
+                    }
+                }
+                let data = {
+                    "operationName": "GetFlights",
+                    "variables": {
+                        "input": {
+                            "latitudeMin": latLngData.maxLat,
+                            "longitudeMin": latLngData.minLng,
+                            "latitudeMax": latLngData.minLat,
+                            "longitudeMax": latLngData.maxLng
+                        }
+                    },
+                    "query": "query GetFlights($input: FlightsInput!) {\nflights(input: $input) {\n    id\n    callsign\n    timePosition\n    coordinates(predict: true) {\n      longitude\n      latitude\n      __typename\n    }\n    velocity    altitude {\n      barometric\n      geometric\n      __typename\n    }\n    direction\n    velocity\n    __typename\n  }\n}\n"
+                }
+                xmlHttp.setRequestHeader("accept", "*/*");
+                xmlHttp.setRequestHeader("content-type", "application/json");
+                xmlHttp.send(JSON.stringify(data));
+                fetchingData = true;
+            }
+
+            let populateDataV2 = (data) => {
+                data.data.flights.forEach(async (flightData) => {
+                    let latlng = new google.maps.LatLng(
+                        flightData.coordinates.latitude,
+                        flightData.coordinates.longitude
+                    );
+                    let pixelData = overlay.getProjection().fromLatLngToContainerPixel(latlng);
+                    let result = ((pixelData.x - radarPos.center_x) * (pixelData.x - radarPos.center_x) + (pixelData.y - radarPos.center_y) * (pixelData.y - radarPos.center_y) <= (radarPos.width/2) * (radarPos.width/2));
+                    if(result) {
+                        var traffic = document.createElement('div');
+                        traffic.id = flightData.id;
+                        traffic.classList.add('radar-pop');
+                        traffic.style.left = pixelData.x+'px';
+                        traffic.style.top = pixelData.y+'px';
+                        let trafficDetail = document.createElement('span')
+                        trafficDetail.innerText = flightData.callsign + "\n" + (Number.parseInt(flightData.altitude.geometric) * 3.281).toFixed(0) + "ft\n" + (Number.parseInt(flightData.velocity) * 3.6).toFixed(0) + "km";
+                        traffic.appendChild(trafficDetail);
+                        document.getElementsByTagName('body')[0].appendChild(traffic)
+                    }
+                })
+            }
+            
+            let cleanWindow = () => {
+                let radarObjs = document.getElementsByClassName('radar-pop');
+                while(radarObjs.length > 0) {
+                    radarObjs[radarObjs.length-1].remove();
+                }
+            }
+
+            let cleanMap = () => {
+                let eve = new MouseEvent('click');
+                document.getElementsByClassName('dismissButton')[0].dispatchEvent(eve);
+                let classToRemove = ['.gm-control-active.gm-fullscreen-control', '.gmnoprint'];
+                classToRemove.forEach((cls) => {
+                    document.querySelectorAll(cls).forEach((ele) => {
+                        ele.remove();
+                    })
+                })
+            }
+        </script>
+    </head>
+    <body>
+        <div class="master-container hide-radar">
+            <div id="map"></div>
+            <div class="radar-conatiner">
+                <div class="radar-inner-circle"></div>
+                <div class="radar-inner-circle"></div>
+                <div class="radar-inner-circle"></div>
+                <div class="radar-inner-circle"></div>
+                <div class="radar-inner-circle"></div>
+                <div id="rotator-hand" class="rotator-hand"></div>
+            </div>
+            <button id="button" class="radar-button">
+                <span class="material-icons">radar</span>
+            </button>
+        </div>
+        <script id="mapScript" defer></script>
+        <script>
+            document.getElementById('mapScript').src = `https://maps.googleapis.com/maps/api/js?key=${tokens.GOOGLE_MAPS_TOKEN}&libraries=drawing&callback=initMap`
+            let map;
+            var overlay;
+            var projection;
+
+            function initMap() {
+                const customLatLng = { lat: 13.197883, lng: 77.710452 };
+                map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 8,
+                    center: customLatLng,
+                    mapId: tokens.MAP_ID
+                });
+                overlay = new google.maps.OverlayView();
+                overlay.draw = function() {};
+                overlay.onAdd = function() {
+                    projection = this.getProjection();
+                };
+                overlay.setMap(map);
+                handleUtil()
+            }
+
+            let handleUtil  = () => {
+                let interval =  setInterval(() => {
+                    if (typeof google === 'object' && typeof google.maps === 'object') {
+                        cleanMap()
+                        clearInterval(interval)
+                    } else {
+                        // handleUtil()
+                    }
+                }, 500);
+            }
+        </script>
+    <body>
+</html>

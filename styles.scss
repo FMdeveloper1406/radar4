@@ -1,0 +1,193 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: black;
+}
+#map {
+    height: 100%;
+    position: unset !important;
+    // opacity: 0;
+}
+body {
+    position: relative;
+}
+.master-container {
+    overflow: hidden;
+    top: 0;
+    position: absolute;
+    // opacity: 0.5;
+    width: 100vw;
+    height: 100vh;
+    background-color: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    &.show-radar {
+        .radar-conatiner {
+            display: flex;
+
+            > hr.rotator-hand {
+                animation: rotate 10s infinite 0s forwards;
+            }
+        }
+    }
+    
+    &.hide-radar {
+        .radar-conatiner {
+            display: none;
+        }
+    }
+}
+
+.radar-conatiner {
+    top: 0;
+    position: relative;
+    // display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50vw;
+    height: 50vw;
+    border-radius: 50%;
+    border: 5px solid #3e8614;//rgb(47, 117, 6);
+    z-index: 0;
+    overflow: hidden;
+
+    .radar-inner-circle {
+        position: absolute;
+        border-radius: 50%;
+        border: 1px solid #3e8614;//rgb(47, 117, 6);
+    }
+
+    > div:nth-child(1) {
+        width: 80%;
+        height: 80%;
+    }
+
+    > div:nth-child(2) {
+        width: 60%;
+        height: 60%;
+    }
+
+    > div:nth-child(3) {
+        width: 40%;
+        height: 40%;
+    }
+
+    > div:nth-child(4) {
+        width: 20%;
+        height: 20%;
+    }
+
+    > div:nth-child(5) {
+        width: 3%;
+        height: 3%;
+    }
+
+    > hr.rotator-hand {
+        width: 50%;
+        height: 0px;
+        // border: .5px solid #3e8614;
+        position: absolute;
+        right: 50%;
+        transition: transform 10s linear;
+        transform-origin: top right;
+        transform-style: preserve-3D;
+    }
+
+    > div.rotator-hand {
+        width: 60%;
+        height: 60%;
+        position: absolute;
+        top: 50%;
+        transition: transform 10s;
+        transform-origin: top left;
+        animation: rotate 10s infinite;
+        animation-timing-function: linear;
+        z-index: -1;
+        transform: rotateZ(45deg);
+        right: -10%;
+        background: linear-gradient(361deg, #00ff4e -10%, transparent);
+    }
+}
+
+@media screen and (max-width: 500px) {
+    .radar-conatiner {
+        width: 80vw;
+        height: 80vw;
+    }
+}
+
+@media screen and (min-width: 501px) and (max-width: 750px) {
+    .radar-conatiner {
+        width: 70vw;
+        height: 70vw;
+    }
+}
+
+@media not all and (min-resolution:.001dpcm) {
+    @supports (-webkit-appearance:none) {
+        div.rotator-hand { 
+            background:linear-gradient(22deg, #00ff4e -10%, transparent) !important;
+        }
+    }
+}
+
+.rotate-hand {
+    transform: rotate(360deg);
+}
+
+@keyframes rotate {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.radar-button {
+    position: fixed;
+    right: 10px;
+    bottom: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 5px;
+    border: 0;
+    cursor: pointer;
+    color: rgb(71, 197, 27);
+    background: #2d2d2d;
+
+    > span {
+        font-size: 36px;
+    }
+}
+
+.radar-pop {
+    cursor: pointer;
+    border-radius: 50%;
+    background-color: #47C51B;
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    z-index: 99999;
+}
+
+.radar-pop > span {
+    display: none;
+    color: white;
+    font-size: medium;
+    font-family: monospace;
+    position: absolute;
+    left: 15px;
+    top: -3px;
+}
+
+.radar-pop:hover {
+    z-index: 9999999 !important;
+}
+
+.radar-pop:hover > span {
+    display: block;
+}
