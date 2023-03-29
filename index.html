@@ -1,212 +1,270 @@
-<!DOCTYPE HTML>
-<html>
-    <head>
-        <title>
-            Radar
-        </title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="styles.css">
-        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-        <!-- File in which google maps token is present as JSON -->
-        <script src="keys/key.js"></script>
-        <script>
-            let showing = false;
-            let minLat, minLng, maxLat, maxLng;
-            let fetchingData = false;
-            let radarActive = false;
-            let radarPos = {
-                '-x': 0,
-                'x': 0,
-                'y': 0,
-                '-y': 0,
-                'center_x': 0,
-                'center_y': 0,
-                'width': 0,
-                'height': 0
-            }
-            window.onload = () => {
-                var radarRotatorHand = document.getElementById("rotator-hand");
-                radarRotatorHand.addEventListener("animationiteration", function(e) { 
-                    if(radarActive && !fetchingData) {
-                        fetchData({minLat, maxLat, minLng, maxLng})
-                    }
-                }, false);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>flight map demo</title>
 
-                document.getElementById('button').addEventListener('click', () => {
-                    showing = !showing;
-                    if(showing) {
-                        radarActive = true;
-                        document.getElementsByClassName('master-container')[0].classList.replace('hide-radar', 'show-radar');
-                        map.setOptions({draggable: false, zoomControl: false, scrollwheel: false, disableDoubleClickZoom: true});
-                        setTimeout(() => {
-                            doOp();
-                        }, 10)
-                    }
-                    else {
-                        radarActive = false;
-                        cleanWindow();
-                        document.getElementsByClassName('master-container')[0].classList.replace('show-radar', 'hide-radar');
-                        map.setOptions({draggable: true, zoomControl: true, scrollwheel: true, disableDoubleClickZoom: true});
-                    }
-                });
-            }
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.js"></script>
+    <script charset="utf-8" src="https://d3js.org/d3.v4.min.js"></script>
+    <script charset="utf-8" src="https://cdnjs.cloudflare.com/ajax/libs/dimple/2.3.0/dimple.latest.min.js"></script>
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
 
-            function doOp() {
-                let rect = document.getElementsByClassName('radar-conatiner')[0].getBoundingClientRect();
-                let res = pointToCoordinates({x: rect.x, y: rect.y}, map);
-                let lat = pointToCoordinates({x: rect.x, y: rect.y}, map).lat();
-                let lng = pointToCoordinates({x: rect.x, y: rect.y}, map).lng();
-                radarPos['-x'] = rect.x;
-                radarPos['x'] = rect.x + rect.width;
-                radarPos['-y'] = rect.y;
-                radarPos['y'] = rect.y + rect.height;
-                radarPos['center_x'] = rect.x + (rect.width/2);
-                radarPos['center_y'] = rect.y + (rect.height/2);
-                radarPos['width'] = rect.width;
-                radarPos['height'] = rect.height;
-                minLat = res.lat();
-                minLng = res.lng();
-                res = pointToCoordinates({x: rect.x + rect.width, y: rect.y}, map);
-                maxLng = res.lng();
-                res = pointToCoordinates({x: rect.x, y: rect.y + rect.height}, map);
-                maxLat = res.lat();
-                fetchData({minLat, maxLat, minLng, maxLng});
-            }
+    <link rel="stylesheet" type="text/css" href="./css/sidenav.css">
+    <link rel="stylesheet" type="text/css" href="./css/chartshow.css">
 
-            function coordinatesToPoint(latLng, map) {
-                var topRight = map.getProjection().fromLatLngToPoint(map.getBounds().getNorthEast());
-                var bottomLeft = map.getProjection().fromLatLngToPoint(map.getBounds().getSouthWest());
-                var scale = Math.pow(2, map.getZoom());
-                var worldPoint = map.getProjection().fromLatLngToPoint(latLng);
-                return new google.maps.Point((worldPoint.x - bottomLeft.x) * scale, (worldPoint.y - topRight.y) * scale);
-            }
+    <style>
+        body { margin: 0; padding: 0; }
+        #basemap { position: absolute; top: 0; bottom: 0; width: 100%; };
+        
+        .map-info{
+            background-color: #fff;
+            box-shadow:0 1px 2px rgba(0, 0, 0, 0.20);
+            border-radius: 3px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
 
-            function pointToCoordinates(point, map) {
-                var topRight = map.getProjection().fromLatLngToPoint(map.getBounds().getNorthEast());
-                var bottomLeft = map.getProjection().fromLatLngToPoint(map.getBounds().getSouthWest());
-                var scale = Math.pow(2, map.getZoom());
-                var worldPoint = new google.maps.Point(point.x / scale + bottomLeft.x, point.y / scale + topRight.y);
-                return map.getProjection().fromPointToLatLng(worldPoint);
-            }
+        .marker {
+            background-image: 'circle';
+            background-size: cover;
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
 
-            let fetchData = (latLngData) => {
-                let url = "https://fdr-bymda.herokuapp.com/";
-                let xmlHttp = new XMLHttpRequest();
-                xmlHttp.open("POST", url, false);
-                xmlHttp.onreadystatechange = () => {
-                    if(xmlHttp.readyState === 4 && xmlHttp.status === 200) {
-                        let responseData = JSON.parse(xmlHttp.response);
-                        cleanWindow();
-                        populateDataV2(responseData)
-                    }
-                }
-                let data = {
-                    "operationName": "GetFlights",
-                    "variables": {
-                        "input": {
-                            "latitudeMin": latLngData.maxLat,
-                            "longitudeMin": latLngData.minLng,
-                            "latitudeMax": latLngData.minLat,
-                            "longitudeMax": latLngData.maxLng
-                        }
-                    },
-                    "query": "query GetFlights($input: FlightsInput!) {\nflights(input: $input) {\n    id\n    callsign\n    timePosition\n    coordinates(predict: true) {\n      longitude\n      latitude\n      __typename\n    }\n    velocity    altitude {\n      barometric\n      geometric\n      __typename\n    }\n    direction\n    velocity\n    __typename\n  }\n}\n"
-                }
-                xmlHttp.setRequestHeader("accept", "*/*");
-                xmlHttp.setRequestHeader("content-type", "application/json");
-                xmlHttp.send(JSON.stringify(data));
-                fetchingData = true;
-            }
+        .airport-info {
+            position: absolute;
+            font-family: 'Optima';
+            margin-top: 5px;
+            margin-left: 5px;
+            padding: 5px;
+            width: 30%;
+            border: 2px solid black;
+            font-size: 14px;
+            color: #222;
+            background-color: #fff;
+            border-radius: 1px;
+            transition: 0.5s; 
+        }
+        .mapboxgl-popup {
+            max-width: 400px;
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+    </style>
+</head>
 
-            let populateDataV2 = (data) => {
-                data.data.flights.forEach(async (flightData) => {
-                    let latlng = new google.maps.LatLng(
-                        flightData.coordinates.latitude,
-                        flightData.coordinates.longitude
-                    );
-                    let pixelData = overlay.getProjection().fromLatLngToContainerPixel(latlng);
-                    let result = ((pixelData.x - radarPos.center_x) * (pixelData.x - radarPos.center_x) + (pixelData.y - radarPos.center_y) * (pixelData.y - radarPos.center_y) <= (radarPos.width/2) * (radarPos.width/2));
-                    if(result) {
-                        var traffic = document.createElement('div');
-                        traffic.id = flightData.id;
-                        traffic.classList.add('radar-pop');
-                        traffic.style.left = pixelData.x+'px';
-                        traffic.style.top = pixelData.y+'px';
-                        let trafficDetail = document.createElement('span')
-                        trafficDetail.innerText = flightData.callsign + "\n" + (Number.parseInt(flightData.altitude.geometric) * 3.281).toFixed(0) + "ft\n" + (Number.parseInt(flightData.velocity) * 3.6).toFixed(0) + "km";
-                        traffic.appendChild(trafficDetail);
-                        document.getElementsByTagName('body')[0].appendChild(traffic)
-                    }
-                })
-            }
+<body>
+    <div id="comparison-container">
+        <div id="basemap"></div>    
+        <div id="trail_animation"></div>
+    </div>
+
+    <!--side navigation-->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick=" close_nav()">&times;</a>
+        <a href="#" type="checkbox" name="layers" id="layer_airport_point" value="airport_point">&#9745; airports: point</a>
+        <a href="#" type="checkbox" name="layers" id="layer_airport_heatmap" value="airport_heatmap">&#9744; airports: heatmap</a>
+        <a href="#" type="checkbox" name="layers" id="layer_flight" value="flights">&#9745; flights</a>
+        <!-- <a href="#" type="checkbox" name="layers" id="layer_trail" value="trail">&#9744; flight trails (Visualization)</a> -->
+        <a href="/anime.html" type="checkbox" name="layers" id="layer_trail_anime" value="trail">&#9744; flight trails (animation)</a>
+
+    </div>
+    
+    <div class='airport-info' id="infobox">
+        <h2 style="font-size:30px">BASIC FLIGHT MAP</h2>
+        <span style="font-size:20px;cursor:pointer" onclick=" open_nav()">&#9776; show mode navigation</span>
+        <div id='open_chart' style="font-size:20px;cursor:pointer" onclick="open_chartshow()">&#9744; data statistic</div>
+        <div style="font-size:20px;"><strong>Airport name:</strong> <span id='airport-name'></span></div>
+        <div style="font-size:20px;"><strong>Country:</strong> <span id='airport-country'></span></div>
+        <div style="font-size:20px;"><strong>selected country:</strong> <span id='select-status'></span></div>
+        <div style="font-size:20px;"><strong>Aircraft from selected country:</strong> <span id='num-flights'></span></div>
+
+        <p class="author">Made by Ce HOU</p>
+        <p class="credit">Data source: <a href="http://www.flightradar24.com/">flightradar24</a> and <a href="https://github.com/ufoe/d3js-geojson">world map</a></p>
+    </div>
+
+    <div id="chartshow">
+        <a href="javascript:void(0)" class="closebtn" onclick=" close_chartshow()">&times;</a>
+        <p  id="charttitle" ><strong>Count of flight origin/destination countries</strong></p>
+    </div>
+
+    <!-- load a basemap -->
+    <script>
+        mapboxgl.accessToken = 
+        'pk.eyJ1IjoiaG91Y2UzMTUiLCJhIjoiY2t5aXhqdDViMXp5eDJ1cWgxaTV2emk3aiJ9.FG6QyhcRbpEN46pEJN7iHA';
+        var map = new mapboxgl.Map({
+        container: 'basemap', // container id
+        style: 'mapbox://styles/houce315/cl0ljztub003s15qp5xbld0no', //mapbox style ID 
+        center: [-0.1, 51.5], // starting position [lng, lat]
+        zoom: 4 // starting zoom
+        });
+
+        // Add navigation controls
+        const nav = new mapboxgl.NavigationControl();
+        map.addControl(nav, 'top-right');
+        map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    </script>
+    
+    <!-- show airports and the heatmap -->
+    <script src="./js/airport.js"></script>
+
+    <!-- show airports and the heatmap -->
+    <script src="./js/trail_viz.js"></script>
+
+    <!-- add hover -->
+    <script src="./js/hover.js"></script>
+
+    <!-- flight viz -->
+    <script src="./js/flight_viz.js" id="flight_viz_layer" style="visibility: hidden;"></script>
+
+    <!-- data analysis -->
+    <svg width="600" height="600"></svg>
+    <script src="./js/data_analy.js"></script>
+    
+    <!-- add a hover effect -->
+
+    <!-- functions about show side area and close them -->
+    <script type="text/javascript">
+        // open side navigation
+        function  open_nav() {
+            document.getElementById("mySidenav").style.width = "250px";
+            document.getElementById("infobox").style.marginLeft = "250px";
+            document.body.style.backgroundColor = "rgba(0,0,0,0.4)";
+        }
+
+        // close the side navigation
+        function  close_nav() {
+            document.getElementById("mySidenav").style.width = "0";
+            document.getElementById("infobox").style.marginLeft = "0";
+            document.body.style.backgroundColor = "black";
+        }
+
+        // open chart show
+        function open_chartshow() {
+            document.getElementById("chartshow").style.width = "30%";
+            document.getElementById('open_chart').innerHTML = '&#9745; data statistic';
+            document.body.style.backgroundColor = "rgba(0,0,0,0.4)";
             
-            let cleanWindow = () => {
-                let radarObjs = document.getElementsByClassName('radar-pop');
-                while(radarObjs.length > 0) {
-                    radarObjs[radarObjs.length-1].remove();
-                }
-            }
+        }
 
-            let cleanMap = () => {
-                let eve = new MouseEvent('click');
-                document.getElementsByClassName('dismissButton')[0].dispatchEvent(eve);
-                let classToRemove = ['.gm-control-active.gm-fullscreen-control', '.gmnoprint'];
-                classToRemove.forEach((cls) => {
-                    document.querySelectorAll(cls).forEach((ele) => {
-                        ele.remove();
-                    })
-                })
-            }
-        </script>
-    </head>
-    <body>
-        <div class="master-container hide-radar">
-            <div id="map"></div>
-            <div class="radar-conatiner">
-                <div class="radar-inner-circle"></div>
-                <div class="radar-inner-circle"></div>
-                <div class="radar-inner-circle"></div>
-                <div class="radar-inner-circle"></div>
-                <div class="radar-inner-circle"></div>
-                <div id="rotator-hand" class="rotator-hand"></div>
-            </div>
-            <button id="button" class="radar-button">
-                <span class="material-icons">radar</span>
-            </button>
-        </div>
-        <script id="mapScript" defer></script>
-        <script>
-            document.getElementById('mapScript').src = `https://maps.googleapis.com/maps/api/js?key=${tokens.GOOGLE_MAPS_TOKEN}&libraries=drawing&callback=initMap`
-            let map;
-            var overlay;
-            var projection;
+        function close_chartshow() {
+            document.getElementById("chartshow").style.width = "0";
+            document.getElementById('open_chart').innerHTML = '&#9744; data statistic';
+            document.body.style.backgroundColor = "black";
+        }
+    </script>
 
-            function initMap() {
-                const customLatLng = { lat: 13.197883, lng: 77.710452 };
-                map = new google.maps.Map(document.getElementById("map"), {
-                    zoom: 8,
-                    center: customLatLng,
-                    mapId: tokens.MAP_ID
-                });
-                overlay = new google.maps.OverlayView();
-                overlay.draw = function() {};
-                overlay.onAdd = function() {
-                    projection = this.getProjection();
-                };
-                overlay.setMap(map);
-                handleUtil()
-            }
+    <script>
+        // Create a popup, but don't add it to the map yet.
+        const popup = new mapboxgl.Popup({
+        closeButton: true,
+        closeOnClick: true
+        });
+        
+        map.on('mouseenter', 'trail-viz', (event) => {
+        // Change the cursor style as a UI indicator.
+        map.getCanvas().style.cursor = 'pointer';
+        
+        // get average coordinates.
+        const ave_lon = (event.features[0].geometry.coordinates[0][0] + event.features[0].geometry.coordinates[1][0]) / 2;
+        const ave_lat = (event.features[0].geometry.coordinates[0][1] + event.features[0].geometry.coordinates[1][1]) / 2;
+        const coordinates = [ave_lon,ave_lat];
 
-            let handleUtil  = () => {
-                let interval =  setInterval(() => {
-                    if (typeof google === 'object' && typeof google.maps === 'object') {
-                        cleanMap()
-                        clearInterval(interval)
-                    } else {
-                        // handleUtil()
-                    }
-                }, 500);
-            }
-        </script>
-    <body>
+        // console.log(coordinates)
+        const description = '<strong>flight ID:</strong>' + event.features[0].properties.flight_id + '<\p>'
+                            + '<p><strong>origin country: </strong>' + event.features[0].properties.origin + '<\p>' 
+                            + '<p><strong>destination country: </strong>' + event.features[0].properties.destination + '<\p>' 
+                            + '<p><strong>status: </strong>' + event.features[0].properties.status + '<\p>';
+        
+        // Populate the popup and set its coordinates
+        // based on the feature found.
+        popup.setLngLat(coordinates).setHTML(description).addTo(map);
+        // popup.setLngLat(destination_coordinates).setHTML(terminalshow).addTo(map);
+        });
+        
+        map.on('mouseleave', 'places', () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+        });
+    </script>
+
+    <script>
+        // Target the span elements used in the sidebar
+        const NameDisplay = document.getElementById('airport-name');
+        const CountryDisplay = document.getElementById('airport-country');
+
+        let quakeID = null;
+
+        map.on('mousemove', 'airports-viz', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        // Set constants equal to the current feature's magnitude, location, and time
+        const airportsName = event.features[0].properties.name;
+        const airportsCountry = event.features[0].properties.country;
+
+        // Check whether features exist
+        if (event.features.length === 0) return;
+        // Display the magnitude, location, and time in the sidebar
+        NameDisplay.textContent = airportsName;
+        CountryDisplay.textContent = airportsCountry;
+
+        // If quakeID for the hovered feature is not null,
+        // use removeFeatureState to reset to the default behavior
+        if (quakeID) {
+            map.removeFeatureState({
+            source: 'airports',
+            id: quakeID
+            });
+        }
+
+        quakeID = event.features[0].id;
+            // When the mouse moves over the viz layer, update the
+            // feature state for the feature under the mouse
+            map.setFeatureState({
+                    source: 'airports',
+                    id: quakeID
+                },
+                {
+                    hover: true
+            });
+        });
+
+        //Event listener for layer switch
+        trigger_point = 1;
+        trigger_heatmap = 0;
+        trigger_flight = 1;
+        document.getElementById("layer_airport_point").addEventListener("click", function(){
+        if (trigger_point == 0){
+            map.setPaintProperty('airports-viz','circle-opacity',0.95);
+
+            document.getElementById("layer_airport_point").innerHTML = '&#9745; airports: point';
+            trigger_point = 1;
+        } else {
+            map.setPaintProperty('airports-viz','circle-opacity',0);
+            document.getElementById("layer_airport_point").innerHTML = '&#9744; airports: point'
+            trigger_point = 0;
+            
+        }        
+        });
+
+        document.getElementById("layer_airport_heatmap").addEventListener("click", function(){
+        if (trigger_heatmap == 0){
+            map.setPaintProperty('airports-heat','heatmap-opacity',0.95);
+            document.getElementById("layer_airport_heatmap").innerHTML = '&#9745; airports: heatmap';
+            trigger_heatmap = 1;
+        } else {
+            map.setPaintProperty('airports-heat','heatmap-opacity',0);
+            document.getElementById("layer_airport_heatmap").innerHTML = '&#9744; airports: heatmap';
+            trigger_heatmap = 0;
+        }    
+        });
+
+
+
+    </script>
+
+</body>
 </html>
